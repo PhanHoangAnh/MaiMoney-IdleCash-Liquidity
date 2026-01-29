@@ -16,22 +16,17 @@ def get_status():
     """Summarizes system health with performance metrics."""
     conn = psycopg2.connect(**PSYCOPG2_CONFIG)
     with conn.cursor() as cur:
-        # 1. Base Registry Data
         cur.execute("SELECT total_idle_cash, total_invested, last_close_date FROM fund_registry")
         reg = cur.fetchone()
         idle, inv, last_date = reg if reg else (0, 0, None)
         
-        # 2. Performance Metrics (Liability & Shadow Profit)
         cur.execute("SELECT COALESCE(SUM(principal_owned), 0) FROM user_shares")
         liability = cur.fetchone()[0]
         
         cur.execute("SELECT COALESCE(SUM(accrued_interest), 0) FROM portfolio")
         shadow_profit = cur.fetchone()[0]
         
-        # Calculate Realized P&L (For this PoC, we assume P&L is what has been successfully exited)
-        # In a full V3, this would come from a dedicated PNL table.
         realized_pnl = 0.00 
-
         next_date = last_date + timedelta(days=1) if last_date else datetime.now().date()
         
     conn.close()
@@ -45,14 +40,39 @@ def get_status():
         "next_expected_date": str(next_date)
     })
 
+@api_blueprint.route('/pending-summary', methods=['GET'])
+def get_pending_summary():
+    """Aggregated stats for the header."""
+    return jsonify(ledger.get_daily_aggregation())
+
+@api_blueprint.route('/pending-list', methods=['GET'])
+def get_pending_list():
+    """Granular list of transactions for editing/deleting in FrontOffice."""
+    return jsonify(ledger.get_pending_list())
+
+@api_blueprint.route('/pending/<int:tx_id>', methods=['DELETE'])
+def cancel_pending(tx_id):
+    """Cancels a pending request."""
+    try:
+        ledger.cancel_pending(tx_id)
+        return jsonify({"message": "Transaction canceled"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api_blueprint.route('/pending/<int:tx_id>', methods=['PATCH'])
+def update_pending(tx_id):
+    """Updates a pending request amount."""
+    data = request.get_json()
+    new_amount = data.get('amount')
+    try:
+        ledger.update_pending(tx_id, new_amount)
+        return jsonify({"message": "Transaction updated"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @api_blueprint.route('/audit/full', methods=['GET'])
 def get_audit():
-    """Provides detailed audit data including lot maturity dates."""
     return jsonify(auditor.get_full_audit_data())
-
-@api_blueprint.route('/pending-summary', methods=['GET'])
-def get_pending():
-    return jsonify(ledger.get_daily_aggregation())
 
 @api_blueprint.route('/reports', methods=['GET'])
 def get_reports():
