@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Treasury Hub | Liquidity Ledger V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .metric-card { transition: all 0.2s ease; border: 1px solid #f1f5f9; }
+        .metric-card:hover { border-color: #e2e8f0; box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05); }
+        
+        .lot-card { 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+            border: 1px solid #f1f5f9;
+        }
+        .lot-card:hover { 
+            border-color: #3b82f6; 
+            transform: translateX(4px);
+            background-color: #f8fafc;
+        }
+        .lot-card.active { 
+            border-color: #2563eb; 
+            background-color: #eff6ff; 
+            border-left-width: 4px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-[#fbfcfd] text-slate-900 selection:bg-blue-100">
+
+    <!-- Top Navigation -->
+    <nav class="bg-white border-b border-slate-100 px-8 py-3 sticky top-0 z-50">
+        <div class="max-w-[1600px] mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="bg-slate-900 p-2 rounded-lg text-white">
+                    <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-extrabold tracking-tight text-slate-800 uppercase leading-none">Liquidity Ledger</h1>
+                    <p class="text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-0.5">V3 Institutional Engine</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-8">
+                <div class="text-right border-r border-slate-100 pr-8">
+                    <span id="next-date-display" class="text-xs font-bold text-slate-800 tracking-tight">--</span>
+                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Next Settle</p>
+                </div>
+                <a href="/transactions" class="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors">
+                    <i data-lucide="arrow-up-right" class="w-4"></i>
+                    <span class="text-[11px] font-bold uppercase tracking-wider">Front Office</span>
+                </a>
+                <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                    <i data-lucide="user" class="w-4"></i>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-[1600px] mx-auto p-8 space-y-8 fade-in">
+        
+        <!-- Executive KPI Bar -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="bg-white p-5 rounded-2xl metric-card">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Liability</p>
+                    <i data-lucide="users" class="w-3.5 h-3.5 text-slate-300"></i>
+                </div>
+                <h3 id="stat-liability" class="text-xl font-bold text-slate-900">$0.00</h3>
+                <div class="mt-3 flex items-center gap-1.5">
+                    <div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                    <span class="text-[9px] font-bold text-slate-400 uppercase">Current User Claims</span>
+                </div>
+            </div>
+            
+            <div class="bg-white p-5 rounded-2xl metric-card">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Shadow Profit</p>
+                    <i data-lucide="trending-up" class="w-3.5 h-3.5 text-blue-400"></i>
+                </div>
+                <h3 id="stat-shadow" class="text-xl font-bold text-blue-600">$0.00</h3>
+                <div class="mt-3 flex items-center gap-1.5">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase">Accrued Unallocated</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl metric-card">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Realized P&L</p>
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+                </div>
+                <h3 id="stat-pnl" class="text-xl font-bold text-emerald-600">$0.00</h3>
+                <div class="mt-3 flex items-center gap-1.5">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase">Settled Interest</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl metric-card border-l-4 border-l-slate-900">
+                <div class="flex justify-between items-start mb-3">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Status</p>
+                    <span class="flex h-2 w-2 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                </div>
+                <h3 class="text-xl font-bold text-slate-900 uppercase tracking-tight">Synchronized</h3>
+                <p id="last-close-label" class="text-[9px] font-bold text-slate-400 mt-3 uppercase tracking-tighter">Last Close: --</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left Column: Performance & Settlement -->
+            <div class="lg:col-span-8 space-y-8">
+                
+                <!-- Performance Chart Section -->
+                <section class="bg-white rounded-3xl border border-slate-100 p-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 class="text-xs font-extrabold text-slate-800 uppercase tracking-[0.15em]">Asset Evolution</h2>
+                            <p class="text-[10px] font-medium text-slate-400 mt-1 uppercase">Dynamic Scale • Time-Series Analysis</p>
+                        </div>
+                        <div class="flex items-center gap-6">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-0.5 bg-blue-600"></span>
+                                <span class="text-[10px] font-bold uppercase text-slate-500">Total Assets</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-0.5 border-t-2 border-dashed border-slate-600"></span>
+                                <span class="text-[10px] font-bold uppercase text-slate-500">Liability</span>
+                            </div>
+                            <button onclick="resetZoom()" class="px-3 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-bold text-slate-400 hover:bg-slate-100 transition-colors uppercase">Reset Zoom</button>
+                        </div>
+                    </div>
+                    <div class="h-[320px] w-full cursor-crosshair">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Settlement Control Panel -->
+                <section class="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+                    <div class="flex items-center gap-3 mb-8">
+                        <div class="p-2 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="command" class="w-4 h-4"></i></div>
+                        <h2 class="text-xs font-extrabold text-slate-800 uppercase tracking-widest">Settlement Control</h2>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6 mb-8">
+                        <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-center">Aggregation: Inflow</p>
+                            <h3 id="pending-deposit" class="text-3xl font-extrabold text-slate-800 text-center tracking-tight">$0.00</h3>
+                        </div>
+                        <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-center">Aggregation: Outflow</p>
+                            <h3 id="pending-withdrawal" class="text-3xl font-extrabold text-slate-800 text-center tracking-tight">$0.00</h3>
+                        </div>
+                    </div>
+
+                    <div id="inv-panel" class="hidden p-6 bg-blue-50/30 rounded-2xl border border-blue-100 space-y-4 mb-8">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i data-lucide="briefcase" class="w-3.5 h-3.5 text-blue-600"></i>
+                            <p class="text-[10px] font-black text-blue-600 uppercase tracking-[0.1em]">Allocation Strategy (Pillar V3)</p>
+                        </div>
+                        <div class="grid grid-cols-4 gap-4">
+                            <div class="space-y-1">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase ml-1">Bank</label>
+                                <input type="text" id="inv-bank" value="ACB" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase ml-1">Yield (%)</label>
+                                <input type="number" id="inv-rate" value="8.5" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase ml-1">Exit (%)</label>
+                                <input type="number" id="inv-early" value="2.0" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[9px] font-bold text-slate-400 uppercase ml-1">Tenor</label>
+                                <select id="inv-tenor" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none">
+                                    <option value="180">180 Days</option>
+                                    <option value="360">360 Days</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="executeSettlement()" id="settle-btn" class="btn-primary w-full text-white font-extrabold py-5 rounded-2xl uppercase tracking-widest text-xs disabled:opacity-30 disabled:cursor-not-allowed">
+                        Commit Final Settlement
+                    </button>
+                </section>
+            </div>
+
+            <!-- Right Column: Professional Sidebar -->
+            <div class="lg:col-span-4">
+                <section class="bg-white rounded-3xl border border-slate-100 shadow-sm h-full min-h-[920px] flex flex-col overflow-hidden">
+                    <div class="p-6 border-b border-slate-50 flex justify-between items-center bg-white">
+                        <h2 class="text-xs font-extrabold uppercase tracking-widest text-slate-800">Audit Ledger</h2>
+                        <div class="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-md text-[9px] font-bold uppercase tracking-tighter">
+                            <i data-lucide="shield" class="w-3 h-3"></i> Integrity Verified
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-10">
+                        <!-- Liability Section -->
+                        <div>
+                            <p class="text-[10px] font-extrabold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-900"></span>
+                                Global User Liability
+                            </p>
+                            <div id="audit-users-global" class="space-y-1.5">
+                                <!-- JS Injected Global Users -->
+                            </div>
+                        </div>
+
+                        <!-- Bank Asset Ledger -->
+                        <div>
+                            <p class="text-[10px] font-extrabold text-slate-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                Asset Performance Ledger
+                            </p>
+                            <div id="audit-ports" class="space-y-3 max-h-[420px] overflow-y-auto custom-scrollbar pr-2">
+                                <!-- JS Injected Lots -->
+                            </div>
+                        </div>
+
+                        <!-- Drill-down Breakdown -->
+                        <div id="lot-detail-section" class="hidden pt-8 border-t border-slate-100 fade-in">
+                            <div class="flex justify-between items-center mb-5">
+                                <p id="lot-detail-title" class="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">Lot Distribution</p>
+                                <button onclick="closeLotDetail()" class="text-[9px] font-bold text-slate-400 hover:text-red-500 transition-colors uppercase">Dismiss</button>
+                            </div>
+                            <div id="audit-users-lot" class="space-y-1.5">
+                                <!-- JS Injected Lot Users -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 bg-slate-50/50 border-t border-slate-100">
+                        <button onclick="initDashboard()" class="w-full py-4 bg-white border border-slate-200 rounded-2xl text-[11px] font-extrabold text-slate-600 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm uppercase tracking-wider">
+                            Sync Registry
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        lucide.createIcons();
+        const getUrl = (p) => (window.location.protocol === 'blob:' ? `http://127.0.0.1:5555/api/dashboard${p}` : `/api/dashboard${p}`);
+
+        let nextDate = null;
+        let pending = { count: 0, total_deposit: 0 };
+        let perfChart = null;
+        let lastAuditData = null;
+
+        async function initDashboard() {
+            try {
+                const s = await (await fetch(getUrl('/status'))).json();
+                document.getElementById('next-date-display').innerText = s.next_expected_date;
+                document.getElementById('stat-liability').innerText = `$${s.total_liability.toLocaleString()}`;
+                document.getElementById('stat-shadow').innerText = `$${s.shadow_profit.toLocaleString(undefined, {minimumFractionDigits: 4})}`;
+                document.getElementById('stat-pnl').innerText = `$${s.realized_pnl.toLocaleString()}`;
+                document.getElementById('last-close-label').innerText = `Last Close: ${s.last_close_date || 'None'}`;
+                nextDate = s.next_expected_date;
+
+                const p = await (await fetch(getUrl('/pending-summary'))).json();
+                pending = p;
+                document.getElementById('pending-deposit').innerText = `$${p.total_deposit.toLocaleString()}`;
+                document.getElementById('pending-withdrawal').innerText = `$${p.total_withdrawal.toLocaleString()}`;
+                document.getElementById('inv-panel').classList.toggle('hidden', p.total_deposit <= 0);
+                document.getElementById('settle-btn').disabled = p.count === 0;
+
+                const a = await (await fetch(getUrl('/audit/full'))).json();
+                lastAuditData = a;
+                renderLots(a.portfolios);
+                renderGlobalUsers(a.users);
+
+                const h = await (await fetch(getUrl('/reports'))).json();
+                updateChart(h.reverse()); 
+            } catch(e) { console.error(e); }
+        }
+
+        function renderLots(portfolios) {
+            document.getElementById('audit-ports').innerHTML = portfolios.map(p => `
+                <div class="lot-card p-4 bg-white rounded-2xl cursor-pointer" 
+                     id="lot-card-${p.id}"
+                     onclick="filterUsersByLot(${p.id})">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-[10px] text-slate-900 uppercase tracking-widest">${p.bank} #${p.id}</span>
+                        <span class="text-[10px] font-extrabold text-blue-600">${p.annual_rate_m || '8.5'}% APR</span>
+                    </div>
+                    <div class="flex justify-between items-end mt-3">
+                        <div>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Due: ${p.end || p.maturity_date}</p>
+                            <p class="text-sm font-bold text-slate-900 tracking-tight">$${p.principal.toLocaleString()}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Accrued</p>
+                            <p class="text-xs font-black text-blue-700">+$${p.accrued.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('') || '<p class="text-[10px] text-slate-400 text-center py-4 italic">No Active Assets</p>';
+        }
+
+        function renderGlobalUsers(users) {
+            const totals = {};
+            users.forEach(u => totals[u.uid] = (totals[u.uid] || 0) + u.amt);
+            document.getElementById('audit-users-global').innerHTML = Object.entries(totals).map(([uid, amt]) => `
+                <div class="flex justify-between items-center p-3 bg-white border border-slate-100 rounded-xl">
+                    <span class="font-mono text-[10px] font-bold text-slate-400 uppercase">${uid}</span>
+                    <span class="font-bold text-xs text-slate-800">$${amt.toLocaleString()}</span>
+                </div>
+            `).join('') || '<p class="text-[10px] text-slate-400 text-center py-4 italic">No Active Claims</p>';
+        }
+
+        function filterUsersByLot(lotId) {
+            document.querySelectorAll('.lot-card').forEach(c => c.classList.remove('active'));
+            const selectedCard = document.getElementById(`lot-card-${lotId}`);
+            if (selectedCard) selectedCard.classList.add('active');
+
+            const filteredUsers = lastAuditData.users.filter(u => u.pid == lotId);
+            const section = document.getElementById('lot-detail-section');
+            const list = document.getElementById('audit-users-lot');
+            
+            document.getElementById('lot-detail-title').innerText = `Lot #${lotId} Breakdown`;
+            section.classList.remove('hidden');
+            list.innerHTML = filteredUsers.map(u => `
+                <div class="flex justify-between items-center p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                    <span class="font-mono text-[10px] font-bold text-blue-600">${u.uid}</span>
+                    <span class="font-extrabold text-xs text-blue-800">$${u.amt.toLocaleString()}</span>
+                </div>
+            `).join('');
+            
+            lucide.createIcons();
+            section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function closeLotDetail() {
+            document.getElementById('lot-detail-section').classList.add('hidden');
+            document.querySelectorAll('.lot-card').forEach(c => c.classList.remove('active'));
+        }
+
+        function resetZoom() { if (perfChart) perfChart.resetZoom(); }
+
+        function updateChart(historyData) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            const labels = historyData.map(r => r.date);
+            const assets = historyData.map(r => r.idle + r.invested);
+            const liability = historyData.map(r => r.invested);
+
+            if (perfChart) perfChart.destroy();
+
+            perfChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Total Assets',
+                            data: assets,
+                            borderColor: '#2563eb',
+                            backgroundColor: (context) => {
+                                const chart = context.chart;
+                                const {ctx, chartArea} = chart;
+                                if (!chartArea) return null;
+                                const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                                gradient.addColorStop(0, 'rgba(37, 99, 235, 0)');
+                                gradient.addColorStop(1, 'rgba(37, 99, 235, 0.08)');
+                                return gradient;
+                            },
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#fff',
+                            pointHoverRadius: 6,
+                        },
+                        {
+                            label: 'Liability',
+                            data: liability,
+                            borderColor: '#475569', 
+                            borderDash: [5, 5],     
+                            fill: false,
+                            tension: 0.4,
+                            borderWidth: 2,       
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { 
+                        legend: { display: false },
+                        zoom: {
+                            pan: { enabled: true, mode: 'x' },
+                            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: { color: '#f8fafc', drawBorder: false },
+                            ticks: { 
+                                font: { size: 10, weight: '700' },
+                                color: '#94a3b8',
+                                callback: (v) => '$' + (v / 1000).toFixed(0) + 'k'
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 10, weight: '700' }, color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function executeSettlement() {
+            const btn = document.getElementById('settle-btn');
+            btn.innerText = "Processing Logic..."; btn.disabled = true;
+            try {
+                const res = await fetch(getUrl('/close-day'), {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        date: nextDate, 
+                        investment_params: pending.total_deposit > 0 ? { 
+                            bank: document.getElementById('inv-bank').value, 
+                            rate: document.getElementById('inv-rate').value, 
+                            early_rate: document.getElementById('inv-early').value, 
+                            duration: document.getElementById('inv-tenor').value 
+                        } : null 
+                    })
+                });
+                if(res.ok) initDashboard(); else alert((await res.json()).error);
+            } finally { btn.innerText = "Commit Final Settlement"; btn.disabled = false; }
+        }
+
+        window.onload = initDashboard;
+    </script>
+</body>
+</html>

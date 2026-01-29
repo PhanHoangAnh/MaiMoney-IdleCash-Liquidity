@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Front Office | Liquidity Ledger</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900 font-sans">
+
+    <nav class="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-2">
+            <div class="bg-blue-600 p-2 rounded-lg text-white">
+                <i data-lucide="send"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight">Liquidity Ledger <span class="text-blue-600">FrontOffice</span></h1>
+        </div>
+        <div class="flex gap-6">
+            <a href="/" class="text-slate-500 hover:text-slate-900 text-sm font-medium transition-colors">Back Office</a>
+            <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                TERMINAL ACTIVE
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left: Transaction Entry -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div class="flex items-center gap-2 mb-6">
+                    <i data-lucide="plus-circle" class="text-blue-600"></i>
+                    <h2 class="font-bold text-lg">Queue Deposit</h2>
+                </div>
+                <div class="space-y-4">
+                    <input type="text" id="dep-uid" placeholder="Customer ID" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="number" id="dep-amt" placeholder="Amount ($)" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                    <button onclick="submitDeposit()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">Queue Transaction</button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div class="flex items-center gap-2 mb-6">
+                    <i data-lucide="minus-circle" class="text-red-600"></i>
+                    <h2 class="font-bold text-lg">Queue Withdrawal</h2>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex gap-2">
+                        <input type="text" id="wit-uid" placeholder="Customer ID" class="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
+                        <button onclick="lookupLots()" class="px-4 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"><i data-lucide="search" class="w-4"></i></button>
+                    </div>
+                    <div id="lot-selector" class="hidden space-y-4">
+                        <select id="wit-pid" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"></select>
+                        <input type="number" id="wit-amt" placeholder="Amount ($)" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
+                        <button onclick="submitWithdraw()" class="w-full bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-700 shadow-lg shadow-red-100">Confirm Withdrawal</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Current Queue & History -->
+        <div class="lg:col-span-8 space-y-6">
+            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-4 bg-slate-900 flex justify-between items-center text-white">
+                    <h2 class="font-bold flex items-center gap-2"><i data-lucide="list"></i> Current Pending Queue</h2>
+                    <span id="pending-count" class="bg-blue-500 text-[10px] px-2 py-0.5 rounded-full font-black">0 REQS</span>
+                </div>
+                <div class="p-6">
+                    <div id="summary-stats" class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="p-4 bg-green-50 rounded-xl border border-green-100">
+                            <p class="text-[10px] font-bold text-green-600 uppercase">Total In</p>
+                            <p id="total-dep" class="text-xl font-black text-green-700">$0.00</p>
+                        </div>
+                        <div class="p-4 bg-red-50 rounded-xl border border-red-100">
+                            <p class="text-[10px] font-bold text-red-600 uppercase">Total Out</p>
+                            <p id="total-wit" class="text-xl font-black text-red-700">$0.00</p>
+                        </div>
+                        <div class="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                            <p class="text-[10px] font-bold text-blue-600 uppercase">Net Flow</p>
+                            <p id="net-flow" class="text-xl font-black text-blue-700">$0.00</p>
+                        </div>
+                    </div>
+                    <p class="text-center text-slate-400 text-sm py-10 italic">Pending transaction list displays aggregated totals above. Use Dashboard for full log.</p>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="calendar"></i> Historical Archive</h2>
+                    <input type="date" id="history-date" onchange="loadHistory()" class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none">
+                </div>
+                <div id="history-content" class="min-h-[150px] flex items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl text-slate-400 text-sm">
+                    Pick a date to view past settled volume
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        // Helper to construct URLs that work in both local development and sandboxed previews
+        function getApiUrl(path) {
+            // If we are in a blob environment (like Canvas Preview), 
+            // the relative path won't parse correctly. We default to localhost for development.
+            if (window.location.protocol === 'blob:') {
+                return `http://127.0.0.1:5555${path}`;
+            }
+            return path;
+        }
+
+        async function updateQueue() {
+            try {
+                const res = await fetch(getApiUrl('/api/dashboard/pending-summary'));
+                const data = await res.json();
+                document.getElementById('pending-count').innerText = `${data.count} REQS`;
+                document.getElementById('total-dep').innerText = `$${(data.total_deposit || 0).toLocaleString()}`;
+                document.getElementById('total-wit').innerText = `$${(data.total_withdrawal || 0).toLocaleString()}`;
+                document.getElementById('net-flow').innerText = `$${(data.net_flow || 0).toLocaleString()}`;
+            } catch (err) {
+                console.error("Failed to update queue summary:", err);
+            }
+        }
+
+        async function submitDeposit() {
+            const user_id = document.getElementById('dep-uid').value;
+            const amount = document.getElementById('dep-amt').value;
+            if(!user_id || !amount) return alert("Missing fields");
+
+            try {
+                const res = await fetch(getApiUrl('/api/ledger/deposit'), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id, amount })
+                });
+                if(res.ok) {
+                    document.getElementById('dep-amt').value = '';
+                    updateQueue();
+                } else {
+                    const err = await res.json();
+                    alert(err.error || "Deposit failed");
+                }
+            } catch (err) {
+                alert("Network error: Could not reach server.");
+            }
+        }
+
+        async function lookupLots() {
+            const user_id = document.getElementById('wit-uid').value;
+            if(!user_id) return;
+            
+            try {
+                const res = await fetch(getApiUrl(`/api/dashboard/user-shares/${user_id}`));
+                const data = await res.json();
+                const selector = document.getElementById('lot-selector');
+                const select = document.getElementById('wit-pid');
+
+                if(data.length > 0) {
+                    selector.classList.remove('hidden');
+                    select.innerHTML = data.map(l => `<option value="${l.portfolio_id}">${l.bank} (Available: $${l.balance.toLocaleString()})</option>`).join('');
+                } else {
+                    selector.classList.add('hidden');
+                    alert("No active holdings found for this user.");
+                }
+            } catch (err) {
+                alert("Error connecting to server.");
+            }
+        }
+
+        async function submitWithdraw() {
+            const user_id = document.getElementById('wit-uid').value;
+            const portfolio_id = document.getElementById('wit-pid').value;
+            const amount = document.getElementById('wit-amt').value;
+
+            try {
+                const res = await fetch(getApiUrl('/api/ledger/withdraw'), {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id, portfolio_id, amount })
+                });
+                if(res.ok) {
+                    document.getElementById('lot-selector').classList.add('hidden');
+                    document.getElementById('wit-amt').value = '';
+                    updateQueue();
+                } else {
+                    const err = await res.json();
+                    alert(err.reason || err.error || "Withdrawal failed");
+                }
+            } catch (err) {
+                alert("Error connecting to server.");
+            }
+        }
+
+        async function loadHistory() {
+            const date = document.getElementById('history-date').value;
+            if(!date) return;
+            
+            const content = document.getElementById('history-content');
+            content.innerHTML = '<span class="animate-pulse">Accessing Archive...</span>';
+            
+            try {
+                const res = await fetch(getApiUrl(`/api/dashboard/history/${date}`));
+                const data = await res.json();
+                
+                if(data.length === 0) {
+                    content.innerHTML = "No settled transactions found for this date.";
+                } else {
+                    content.innerHTML = `
+                        <div class="w-full space-y-2">
+                            ${data.map(t => `
+                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                    <span class="font-mono text-xs">${t.user_id}</span>
+                                    <span class="font-bold ${t.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600'} text-xs">${t.type}</span>
+                                    <span class="font-black">$${(t.amount || 0).toLocaleString()}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                content.innerHTML = "Error loading history.";
+            }
+        }
+
+        setInterval(updateQueue, 5000);
+        updateQueue();
+    </script>
+</body>
+</html>
